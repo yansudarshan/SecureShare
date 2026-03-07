@@ -243,7 +243,9 @@
 
 
 
-
+import nodemailer from "nodemailer";
+import QRCode from "qrcode";
+import validator from "validator";
 import express from "express";
 import multer from "multer";
 import cors from "cors";
@@ -270,6 +272,14 @@ cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
 });
 
 // Multer is a middleware to upload to backend
@@ -408,6 +418,94 @@ app.get("/file/:uid", async (req, res) => {
     res.status(500).send("Server error");
   }
 });
+
+//share route ------------------------------------------------
+app.post("/share", express.json(), async (req, res) => {
+  try {
+
+    const { email, uid } = req.body;
+
+    /* ---------------- SECURITY CHECKS ---------------- */
+
+    if (!email || !uid) {
+      return res.status(400).json({ error: "Email and UID required" });
+    }
+
+    if (!validator.isEmail(email)) {
+      return res.status(400).json({ error: "Invalid email address" });
+    }
+
+    /* ---------------- GET FILE ---------------- */
+
+    const fileDoc = await EncryptedFile.findById(uid);
+
+    if (!fileDoc) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    if (new Date() > fileDoc.expiresAt) {
+      return res.status(410).json({ error: "File expired" });
+    }
+
+    /* ---------------- GENERATE DOWNLOAD URL ---------------- */
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const fileURL = `${baseUrl}/file/${uid}`;
+
+    /* ---------------- GENERATE QR ---------------- */
+
+    const qrImage = await QRCode.toDataURL(fileURL);
+
+    /* ---------------- EMAIL TEMPLATE ---------------- */
+
+    const htmlTemplate = `
+      <div style="font-family:Arial;padding:20px">
+        <h2>SecureShare</h2>
+
+        <p>A file has been shared with you.</p>
+
+        <p><b>File:</b> ${fileDoc.originalName}</p>
+
+        <p><b>Expires:</b> ${new Date(fileDoc.expiresAt).toLocaleString()}</p>
+
+        <p><b>Download Link:</b></p>
+
+        <a href="${fileURL}">
+          ${fileURL}
+        </a>
+
+        <p style="margin-top:20px"><b>QR Code:</b></p>
+
+        <img src="${qrImage}" width="200"/>
+
+        <p style="margin-top:20px;font-size:12px;color:gray">
+        This link may expire automatically.
+        </p>
+      </div>
+    `;
+
+    /* ---------------- SEND EMAIL ---------------- */
+
+    await transporter.sendMail({
+      from: `"SecureShare" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "File Shared With You",
+      html: htmlTemplate
+    });
+
+    res.json({
+      message: "Email sent successfully"
+    });
+
+  } catch (err) {
+    console.error("Share error:", err);
+    res.status(500).json({
+      error: "Failed to send email"
+    });
+  }
+});
+// share route ends ----------------------------------------
+
 // download route
 app.get("/download/:uid", async (req, res) => {
   try {
