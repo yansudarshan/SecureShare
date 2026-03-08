@@ -274,8 +274,11 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// port for smtp protocol
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
@@ -585,7 +588,8 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   await connectDB();
   app.listen(PORT, () =>
-    console.log(` Server running on port ${PORT}`)
+    console.log(` Server running on port ${PORT}`),
+    console.log("started")
   );
 }; 
 
