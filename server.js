@@ -422,42 +422,36 @@ app.get("/file/:uid", async (req, res) => {
 //share route ------------------------------------------------
 app.post("/share", express.json(), async (req, res) => {
   try {
-
+      
     const { email, uid } = req.body;
+     console.log("share route hit");
+     console.log("BODY:", req.body);
 
-    /* ---------------- SECURITY CHECKS ---------------- */
+    // check valid 
 
     if (!email || !uid) {
       return res.status(400).json({ error: "Email and UID required" });
     }
-
     if (!validator.isEmail(email)) {
       return res.status(400).json({ error: "Invalid email address" });
     }
 
-    /* ---------------- GET FILE ---------------- */
-
+    //  Get file from uid 
     const fileDoc = await EncryptedFile.findById(uid);
 
     if (!fileDoc) {
       return res.status(404).json({ error: "File not found" });
     }
-
     if (new Date() > fileDoc.expiresAt) {
       return res.status(410).json({ error: "File expired" });
     }
 
-    /* ---------------- GENERATE DOWNLOAD URL ---------------- */
-
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     const fileURL = `${baseUrl}/file/${uid}`;
 
-    /* ---------------- GENERATE QR ---------------- */
-
     const qrImage = await QRCode.toDataURL(fileURL);
 
-    /* ---------------- EMAIL TEMPLATE ---------------- */
-
+    //EMAIL TEMPLATE ------------------------------------------
     const htmlTemplate = `
       <div style="font-family:Arial;padding:20px">
         <h2>SecureShare</h2>
@@ -483,9 +477,7 @@ app.post("/share", express.json(), async (req, res) => {
         </p>
       </div>
     `;
-
-    /* ---------------- SEND EMAIL ---------------- */
-
+    // SEND EMAIL ---------------------------------- 
     await transporter.sendMail({
       from: `"SecureShare" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -500,7 +492,7 @@ app.post("/share", express.json(), async (req, res) => {
   } catch (err) {
     console.error("Share error:", err);
     res.status(500).json({
-      error: "Failed to send email"
+      error: "Failed to send email" 
     });
   }
 });
