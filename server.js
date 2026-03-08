@@ -423,7 +423,6 @@ app.post("/share", express.json(), async (req, res) => {
      console.log("BODY:", req.body);//---------------
 
     // check valid 
-
     if (!email || !uid) {
       return res.status(400).json({ error: "Email and UID required" });
     }
@@ -445,8 +444,13 @@ app.post("/share", express.json(), async (req, res) => {
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     const fileURL = `${baseUrl}/file/${uid}`;
 
-    const qrImage = await QRCode.toDataURL(fileURL);
-    console.log("created url and qr");//------------------
+     const remainingMinutes = Math.max(
+      0,
+        Math.floor((fileDoc.expiresAt - Date.now()) / 60000)
+         );
+
+    const qrImage = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(fileURL)}`;
+   
     //EMAIL TEMPLATE ------------------------------------------
     const htmlTemplate = `
       <div style="font-family:Arial;padding:20px">
@@ -456,7 +460,7 @@ app.post("/share", express.json(), async (req, res) => {
 
         <p><b>File:</b> ${fileDoc.originalName}</p>
 
-        <p><b>Expires:</b> ${new Date(fileDoc.expiresAt).toLocaleString()}</p>
+        <p><b>Expires in:</b> ${remainingMinutes} minutes</p>
 
         <p><b>Download Link:</b></p>
 
@@ -466,7 +470,9 @@ app.post("/share", express.json(), async (req, res) => {
 
         <p style="margin-top:20px"><b>QR Code:</b></p>
 
-        <img src="${qrImage}" width="200"/>
+        <a href="${fileURL}">
+        <img src="${qrImage}" width="200" alt="QR Code"/>
+        </a>
 
         <p style="margin-top:20px;font-size:12px;color:gray">
         This link may expire automatically.
@@ -485,7 +491,6 @@ app.post("/share", express.json(), async (req, res) => {
     res.json({
       message: "Email sent successfully"
     });
-    console.log("email not done");//-----------------
   } catch (err) {
     console.error("Share error:", err);
     res.status(500).json({
