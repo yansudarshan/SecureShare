@@ -243,7 +243,7 @@
 
 
 
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import QRCode from "qrcode";
 import validator from "validator";
 import express from "express";
@@ -273,18 +273,9 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
+//  Resend api for email
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// port for smtp protocol
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  family:4,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
 
 // Multer is a middleware to upload to backend
 const storage = multer.diskStorage({
@@ -428,8 +419,8 @@ app.post("/share", express.json(), async (req, res) => {
   try {
       
     const { email, uid } = req.body;
-     console.log("share route hit");
-     console.log("BODY:", req.body);
+     console.log("share route hit");//---------------
+     console.log("BODY:", req.body);//---------------
 
     // check valid 
 
@@ -439,7 +430,7 @@ app.post("/share", express.json(), async (req, res) => {
     if (!validator.isEmail(email)) {
       return res.status(400).json({ error: "Invalid email address" });
     }
-     console.log("valid");
+     console.log("valid");///---------------------
     //  Get file from uid 
     const fileDoc = await EncryptedFile.findById(uid);
 
@@ -449,13 +440,13 @@ app.post("/share", express.json(), async (req, res) => {
     if (new Date() > fileDoc.expiresAt) {
       return res.status(410).json({ error: "File expired" });
     }
-    console.log("got file");
+    console.log("got file");///--------------
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     const fileURL = `${baseUrl}/file/${uid}`;
 
     const qrImage = await QRCode.toDataURL(fileURL);
-    console.log("created url and qr");
+    console.log("created url and qr");//------------------
     //EMAIL TEMPLATE ------------------------------------------
     const htmlTemplate = `
       <div style="font-family:Arial;padding:20px">
@@ -482,19 +473,19 @@ app.post("/share", express.json(), async (req, res) => {
         </p>
       </div>
     `;
-    console.log("email template done");
+    console.log("email template done");//-------------------
     // SEND EMAIL ---------------------------------- 
-    await transporter.sendMail({
-      from: `"SecureShare" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "File Shared With You",
-      html: htmlTemplate
+    await resend.emails.send({
+    from: "SecureShare <onboarding@resend.dev>",
+    to: email,
+    subject: "File Shared With You",
+    html: htmlTemplate
     });
-    console.log("email done");
+    console.log("email done");//--------------------------
     res.json({
       message: "Email sent successfully"
     });
-    console.log("email not done");
+    console.log("email not done");//-----------------
   } catch (err) {
     console.error("Share error:", err);
     res.status(500).json({
