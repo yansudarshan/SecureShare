@@ -438,7 +438,7 @@ app.post("/share", express.json(), async (req, res) => {
     if (!validator.isEmail(email)) {
       return res.status(400).json({ error: "Invalid email address" });
     }
-
+     console.log("valid");
     //  Get file from uid 
     const fileDoc = await EncryptedFile.findById(uid);
 
@@ -448,12 +448,13 @@ app.post("/share", express.json(), async (req, res) => {
     if (new Date() > fileDoc.expiresAt) {
       return res.status(410).json({ error: "File expired" });
     }
+    console.log("got file");
 
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     const fileURL = `${baseUrl}/file/${uid}`;
 
     const qrImage = await QRCode.toDataURL(fileURL);
-
+    console.log("created url and qr");
     //EMAIL TEMPLATE ------------------------------------------
     const htmlTemplate = `
       <div style="font-family:Arial;padding:20px">
@@ -480,6 +481,7 @@ app.post("/share", express.json(), async (req, res) => {
         </p>
       </div>
     `;
+    console.log("email template done");
     // SEND EMAIL ---------------------------------- 
     await transporter.sendMail({
       from: `"SecureShare" <${process.env.EMAIL_USER}>`,
@@ -487,11 +489,11 @@ app.post("/share", express.json(), async (req, res) => {
       subject: "File Shared With You",
       html: htmlTemplate
     });
-
+    console.log("email done");
     res.json({
       message: "Email sent successfully"
     });
-
+    console.log("email not done");
   } catch (err) {
     console.error("Share error:", err);
     res.status(500).json({
