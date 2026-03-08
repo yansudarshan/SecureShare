@@ -401,7 +401,7 @@ app.get("/file/:uid", async (req, res) => {
         <body style="font-family:sans-serif;text-align:center;padding:40px">
           <h2>${fileDoc.originalName}</h2>
           <p>Downloads left: <b>${remaining}</b></p>
-          <a href="/download/${fileDoc._id}">
+          <a href="/download/${fileDoc._id}" onclick="setTimeout(()=>location.reload(),1000)">
             <button style="padding:14px 28px;font-size:16px;cursor:pointer">
               ⬇ Download File
             </button>
