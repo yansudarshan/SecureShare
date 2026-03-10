@@ -1,74 +1,61 @@
 import express from "express";
-import fs from "fs";
-
-import upload from "../middleware/multerStorage.js";
-import cloudinary from "../config/cloudinary.js";
-import { encryptFile } from "../utils/encryptFile.js";
 import EncryptedFile from "../models/EncryptedFile.js";
 
 const router = express.Router();
 
-router.post("/upload", upload.single("image"), async (req, res) => {
+router.get("/file/:uid", async (req, res) => {
 
   try {
 
-    const originalPath = req.file.path;
-    const encryptedPath = originalPath + ".enc";
+    const fileDoc =
+      await EncryptedFile.findById(req.params.uid);
 
-    const { iv, authTag } =
-      await encryptFile(originalPath, encryptedPath);
+    if (!fileDoc)
+      return res.status(404).send("File not found");
 
-    fs.unlinkSync(originalPath);
+    if (new Date() > fileDoc.expiresAt)
+      return res.status(410).send("File expired");
 
-    const uploadResult = await cloudinary.uploader.upload(
-      encryptedPath,
-      {
-        resource_type: "raw",
-        folder: "encrypted-files"
-      }
-    );
+    if (
+      fileDoc.maxDownloads !== -1 &&
+      fileDoc.downloadCount >= fileDoc.maxDownloads
+    ) {
+      return res.status(429)
+        .send("Download limit reached");
+    }
 
-    fs.unlinkSync(encryptedPath);
+    const remaining =
+      fileDoc.maxDownloads === -1
+        ? "∞"
+        : fileDoc.maxDownloads - fileDoc.downloadCount;
 
-    const maxDownloads =
-      req.body.maxDownloads !== undefined
-        ? Number(req.body.maxDownloads)
-        : -1;
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+      <title>SecureShare</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1"/>
+      </head>
 
-    const TEN_MINUTES = 10 * 60 * 1000;
+      <body style="font-family:sans-serif;text-align:center;padding:40px">
 
-    const fileDoc = await EncryptedFile.create({
-      cloudinaryUrl: uploadResult.secure_url,
-      iv: iv.toString("base64"),
-      authTag: authTag.toString("base64"),
-      originalName: req.file.originalname,
-      mimeType: req.file.mimetype,
-      expiresAt: new Date(Date.now() + TEN_MINUTES),
-      maxDownloads,
-      downloadCount: 0,
-    });
+      <h2>${fileDoc.originalName}</h2>
 
-    const baseUrl =
-      `${req.protocol}://${req.get("host")}`;
+      <p>Downloads left: <b>${remaining}</b></p>
 
-    const qrURL =
-      `${baseUrl}/file/${fileDoc._id}`;
+      <a href="/download/${fileDoc._id}" onclick="setTimeout(()=>location.reload(),1000)">
+      <button style="padding:14px 28px;font-size:16px;cursor:pointer">
+      ⬇ Download File
+      </button>
+      </a>
 
-    res.json({
-      message: "File uploaded & encrypted",
-      UID: fileDoc._id,
-      downloadURL: qrURL,
-      expiresAt: fileDoc.expiresAt,
-      maxDownloads: fileDoc.maxDownloads,
-      downloadCount: fileDoc.downloadCount,
-    });
+      </body>
+      </html>
+    `);
 
   } catch (err) {
 
-    console.error(err);
-    res.status(500).json({
-      error: "Upload failed"
-    });
+    res.status(500).send("Server error");
 
   }
 
